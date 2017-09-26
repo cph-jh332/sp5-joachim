@@ -3,7 +3,8 @@ Question 1 - Explain what you see in exercise 1)
     But when I change the file name it isn't cached anymore, so it loads slower the first time.
 
 Question 2 - Purpose of the Connection: header)
-    dunno yet
+    You can keep the connection alive so you don't have to establish it again.
+    You can also keep it alive within a time limit or just close it.
 
 Question 3 - Explain the first two requests)
     I requested to go to http://studypoints.dk: but ended up at https://studypoints.dk/#/view1.
