@@ -11,6 +11,13 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -22,16 +29,18 @@ public class SocketDemo {
 
     private ServerSocket serverSocket;
 
+    ExecutorService es = Executors.newCachedThreadPool();
+
     public static void main(String[] args) {
         SocketDemo server = new SocketDemo();
         server.start(6666);
     }
-    
+
     public void start(int port) {
         try {
             serverSocket = new ServerSocket(port);
             while (true) {
-                new EchoClientHandler(serverSocket.accept()).run();
+                es.execute(new EchoClientHandler(serverSocket.accept()));
             }
         } catch (IOException ex) {
             Logger.getLogger(SocketDemo.class.getName()).log(Level.SEVERE, null, ex);
@@ -49,6 +58,8 @@ public class SocketDemo {
 
 class EchoClientHandler extends Thread {
 
+    ExecutorService es = Executors.newCachedThreadPool();
+    static BlockingQueue<String> messages = new ArrayBlockingQueue(100);
     private Socket clientSocket;
     private PrintWriter out;
     private BufferedReader in;
@@ -71,39 +82,87 @@ class EchoClientHandler extends Thread {
             out.println("REVERSE#abcd");
             out.println("TRANSLATE#hund");
             out.println("input any message (will just respond with the same text)");
+            Thread t1 = new Thread(() -> {
+                while (true) {
+                    Future<String> f1 = es.submit(new ReadingMessages());
+                    try {
+                        out.println(f1.get());
+                        sleep(1);
+                    } catch (InterruptedException ex) {
+                        Logger.getLogger(EchoClientHandler.class.getName()).log(Level.SEVERE, null, ex);
+                    } catch (ExecutionException ex) {
+                        Logger.getLogger(EchoClientHandler.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                }
+            });
+            t1.start();
             while (running && (inputLine = in.readLine()) != null) {
-                switch(inputLine){
-                    case "UPPER#Hello World":{
-                        out.println("HELLO WORLD");
+                String[] sArray = inputLine.split("#");
+                String command = sArray[0];
+                switch (command.toLowerCase()) {
+                    case "upper": {
+                        try {
+                            //out.println("HELLO WORLD");
+                            messages.put(sArray[1].toUpperCase());
+                        } catch (InterruptedException ex) {
+                            Logger.getLogger(EchoClientHandler.class.getName()).log(Level.SEVERE, null, ex);
+                        }
                         break;
                     }
-                    
-                    case "LOWER#Hello World":{
-                        out.println("hello world");
+
+                    case "lower": {
+                        try {
+                            //out.println("hello world");
+                            messages.put(sArray[1].toLowerCase());
+                        } catch (InterruptedException ex) {
+                            Logger.getLogger(EchoClientHandler.class.getName()).log(Level.SEVERE, null, ex);
+                        }
                         break;
                     }
-                    
-                    case "REVERSE#abcd":{
-                        out.println("dcba");
+
+                    case "reverse": {
+                        try {
+                            //out.println("dcba");
+                            StringBuilder sb = new StringBuilder();
+                            sb.append(sArray[1]);
+                            messages.put(sb.reverse().toString());
+                        } catch (InterruptedException ex) {
+                            Logger.getLogger(EchoClientHandler.class.getName()).log(Level.SEVERE, null, ex);
+                        }
                         break;
                     }
-                    
-                    case "TRANSLATE#hund":{
-                        out.println("dog");
+
+                    case "translate": {
+                        try {
+                            //out.println("dog");
+                            if (sArray[1].toLowerCase().equals("hund")) {
+                                messages.put("dog");
+                            }else{
+                                messages.put("can't translate: " + sArray[1]);
+                            }
+                        } catch (InterruptedException ex) {
+                            Logger.getLogger(EchoClientHandler.class.getName()).log(Level.SEVERE, null, ex);
+                        }
                         break;
                     }
-                    
-                    case "exit":{
+
+                    case "exit": {
                         out.println("bye");
+                        t1.stop();
                         running = false;
                         break;
                     }
-                    
-                    default:{
-                        out.println(inputLine);
+
+                    default: {
+                        try {
+                            //out.println(inputLine);
+                            messages.put(inputLine);
+                        } catch (InterruptedException ex) {
+                            Logger.getLogger(EchoClientHandler.class.getName()).log(Level.SEVERE, null, ex);
+                        }
                         break;
                     }
-                        
+
                 }
             }
         } catch (IOException ex) {
@@ -118,4 +177,13 @@ class EchoClientHandler extends Thread {
             Logger.getLogger(SocketDemo.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
+}
+
+class ReadingMessages implements Callable {
+
+    @Override
+    public Object call() throws Exception {
+        return EchoClientHandler.messages.take();
+    }
+
 }
