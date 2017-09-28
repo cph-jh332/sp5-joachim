@@ -37,6 +37,8 @@ public class SocketDemo {
     }
 
     public void start(int port) {
+        
+        
         try {
             serverSocket = new ServerSocket(port);
             while (true) {
