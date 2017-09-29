@@ -34,7 +34,7 @@ public class SocketDemo {
 
     public static void main(String[] args) {
         SocketDemo server = new SocketDemo();
-        server.start(6666);
+        server.start(6767);
     }
 
     public void start(int port) {
