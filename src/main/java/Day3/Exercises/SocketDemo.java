@@ -9,6 +9,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import static java.lang.Thread.sleep;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -37,10 +38,26 @@ public class SocketDemo {
     }
 
     public void start(int port) {
-        
-        
+
         try {
             serverSocket = new ServerSocket(port);
+            Thread t1 = new Thread(() -> {
+                while (true) {
+                    Future<String> f1 = es.submit(new ReadingMessages());
+                    try {
+                        
+                        EchoClientHandler.message = f1.get();
+                        
+
+                        sleep(1);
+                    } catch (InterruptedException ex) {
+                        Logger.getLogger(EchoClientHandler.class.getName()).log(Level.SEVERE, null, ex);
+                    } catch (ExecutionException ex) {
+                        Logger.getLogger(EchoClientHandler.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                }
+            });
+            t1.start();
             while (true) {
                 es.execute(new EchoClientHandler(serverSocket.accept()));
             }
@@ -61,6 +78,7 @@ public class SocketDemo {
 class EchoClientHandler extends Thread {
 
     ExecutorService es = Executors.newCachedThreadPool();
+    static String message = "";
     static BlockingQueue<String> messages = new ArrayBlockingQueue(100);
     private Socket clientSocket;
     private PrintWriter out;
@@ -85,14 +103,16 @@ class EchoClientHandler extends Thread {
             out.println("TRANSLATE#hund");
             out.println("input any message (will just respond with the same text)");
             Thread t1 = new Thread(() -> {
+                String temp = "";
                 while (true) {
-                    Future<String> f1 = es.submit(new ReadingMessages());
                     try {
-                        out.println(f1.get());
+                        if (!temp.equalsIgnoreCase(message)) {
+                            out.println(message);
+                            temp = message;
+                        }
+
                         sleep(1);
                     } catch (InterruptedException ex) {
-                        Logger.getLogger(EchoClientHandler.class.getName()).log(Level.SEVERE, null, ex);
-                    } catch (ExecutionException ex) {
                         Logger.getLogger(EchoClientHandler.class.getName()).log(Level.SEVERE, null, ex);
                     }
                 }
@@ -139,7 +159,7 @@ class EchoClientHandler extends Thread {
                             //out.println("dog");
                             if (sArray[1].toLowerCase().equals("hund")) {
                                 messages.put("dog");
-                            }else{
+                            } else {
                                 messages.put("can't translate: " + sArray[1]);
                             }
                         } catch (InterruptedException ex) {
